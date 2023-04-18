@@ -59,10 +59,13 @@ public class SecurityConfig extends WebSecurityConfigurerAdapter {
 }
 ```
 
-이때, **WebSecurityConfigurerAdapter**는 Spring Security 5.7.0-M2에서는 비권장한다. 
+@EnableWebSecurity 없어도 스프링 부트에서 자동 설정
+
+이때, **WebSecurityConfigurerAdapter**는 Spring Security 5.7.0-M2에서는 비권장한다.  
 [자세한 내용 보기](https://github.com/spring-projects/spring-security/issues/10822)  
 
-5.7 이후 버전부터는 **SecurityFilterChain**을 bean으로 주입해서 사용한다. [관련 문서](https://spring.io/blog/2022/02/21/spring-security-without-the-websecurityconfigureradapter)
+5.7 이후 버전부터는 **SecurityFilterChain**을 bean으로 주입해서 사용한다.  
+[관련 문서](https://spring.io/blog/2022/02/21/spring-security-without-the-websecurityconfigureradapter)
 
 ```java
 @Configuration
@@ -82,3 +85,13 @@ public class SecurityConfiguration {
 
 }
 ```
+
+**HttpSecurity의 메서드**
+
+- authorizeHttpRequests : RequestMatcher 구현(예: URL 패턴을 통해)을 사용하여 HttpServletRequest를 기반으로 액세스를 제한
+- mvcMatchers : 경로 패턴 추가
+- permitAll, hasRole : 권한 설정
+- anyRequest : 나머지 경로
+- authenticated : 인증된 사용자만 접근
+- formLogin : form login, logout 기능 사용
+- httpBasic : httpBasic 설정 (자세한 내용은 뒤에서 다룸)
