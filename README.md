@@ -13,6 +13,7 @@
 -->
 
 ## Contents (진행중)
+4/11 ~ 4/18
 - 섹션 0. 스프링 시큐리티: 폼 인증
   - 폼 인증 예제 살펴보기
   - 스프링 웹 프로젝트 만들기
@@ -24,6 +25,19 @@
   - 스프링 시큐리티 테스트 1부
   - 스프링 시큐리티 테스트 2부
 
+4/18 ~ 4/25
+- 섹션 1. 스프링 시큐리티: 아키텍처
+  - SecurityContextHolder와 Authentication
+  - AuthenticationManager와 Authentication
+  - ThreadLocal
+  - Authentication과 SecurityContextHodler
+  - 스프링 시큐리티 필터와 FilterChainProxy
+  - DelegatingFilterProxy와 FilterChainProxy
+  - AccessDecisionManager 1부
+  - AccessDecisionManager 2부
+  - FilterSecurityInterceptor
+  - ExceptionTranslationFilter
+  - 스프링 시큐리티 아키텍처 정리
 
 ## Contributors
 <p>
