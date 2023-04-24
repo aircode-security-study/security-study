@@ -1,0 +1,223 @@
+# Authentication과 SecurityContextHodler
+
+* 인증이 된 Authentication 객체는 어떻게 되는 것인가? **->**  SecurityContextHodler에 들어가서 애플리케이션 전반에 사용이 된다.
+* 인증 이후 다시 접속을 하는 경우 새로 인증을 하는 것이 아니라 인증을 인식하는 방법? **->** 여러 요청에 걸쳐서 유지가 된다.
+
+<br>
+
+크게 두가지 객체가 Authentication을 SecurityContextHodler에 넣어준다.  
+
+* UsernamePasswordAuthenticationFilter
+* SecurityContextPersisenceFilter
+
+<br>
+
+## UsernamePasswordAuthenticationFilter
+
+* 폼 인증을 처리하는 시큐리티 필터
+* 인증된 Authentication 객체를 SecurityContextHolder에 넣어주는 필터
+* SecurityContextHolder.getContext().setAuthentication(authentication)
+
+<br>
+
+## SecurityContextPersistenceFilter
+
+* SecurityContext를 HTTP session에 캐시(기본 전략)하여 여러 요청에서 Authentication을 공유할 수 있는 공유하는 필터
+* SecurityContextRepository를 교체하여 세션을 HTTP session이 아닌 다른 곳에 저장하는 것도 가능
+
+## 순서 살펴보기
+
+1. 매번 요청하면 SecurityContextPersistenceFilter는 SecurityContextHolder에 이미 만들어진 SecurityContext를 읽어오려고 한다.
+(로그인 전이므로 Authentication이 null 값이다.)
+
+<br>
+
+2. 로그인을 시도하면 UsernamePasswordAuthenticationFilter에 걸리게 된다.
+
+`UsernamePasswordAuthenticationFilter` : 폼 인증을 처리하는 필터이다. **->** AuthenticationManager를 가져와서 authenticate 인증이 벌어지는 것이다.
+
+<br>
+
+3. 인증 과정
+
+예외가 만들어지지 않고 무사히 리턴이 되면 상속을 받고 있는 AbstractAuthenticationProcessingFilter로 간다.
+    (AbstractAuthenticationProcessingFilter의 doFilter가 실행이 되고 그 일부에서 UsernamePasswordAuthenticationFilter가 실행)
+
+```java
+
+// UsernamePasswordAuthenticationFilter
+
+public Authentication attemptAuthentication(HttpServletRequest request, HttpServletResponse response) throws AuthenticationException {
+    if (this.postOnly && !request.getMethod().equals("POST")) {
+        throw new AuthenticationServiceException("Authentication method not supported: " + request.getMethod());
+    } else {
+        String username = this.obtainUsername(request);
+        username = username != null ? username.trim() : "";
+        String password = this.obtainPassword(request);
+        password = password != null ? password : "";
+        UsernamePasswordAuthenticationToken authRequest = UsernamePasswordAuthenticationToken.unauthenticated(username, password);
+        this.setDetails(request, authRequest);
+        return this.getAuthenticationManager().authenticate(authRequest); // 여기
+    }
+}
+
+```
+
+UsernamePasswordAuthenticationFilter에서 Authentication을 반환한다.
+
+```java
+
+// AbstractAuthenticationProcessingFilter의 doFilter
+
+private void doFilter(HttpServletRequest request, HttpServletResponse response, FilterChain chain) throws IOException, ServletException {
+    if (!this.requiresAuthentication(request, response)) {
+        chain.doFilter(request, response);
+    } else {
+        try {
+            // * this.getAuthenticationManager().authenticate(authRequest)의 결과값
+            Authentication authenticationResult = this.attemptAuthentication(request, response); // 여기
+            if (authenticationResult == null) {
+                return;
+            }
+
+            this.sessionStrategy.onAuthentication(authenticationResult, request, response);
+            if (this.continueChainBeforeSuccessfulAuthentication) {
+                chain.doFilter(request, response);
+            }
+
+            // * 성공 시 successfulAuthentication로 들어가게 된다.
+            this.successfulAuthentication(request, response, chain, authenticationResult); // 여기
+        } catch (InternalAuthenticationServiceException var5) {
+            this.logger.error("An internal error occurred while trying to authenticate the user.", var5);
+            this.unsuccessfulAuthentication(request, response, var5);
+        } catch (AuthenticationException var6) {
+            this.unsuccessfulAuthentication(request, response, var6);
+        }
+
+    }
+}
+```
+
+성공 시 `successfulAuthentication`이 호출된다.
+
+```java
+
+// AbstractAuthenticationProcessingFilter의 successfulAuthentication 메서드 
+
+protected void successfulAuthentication(HttpServletRequest request, HttpServletResponse response, FilterChain chain, Authentication authResult) throws IOException, ServletException {
+    SecurityContext context = SecurityContextHolder.createEmptyContext();
+    context.setAuthentication(authResult);
+    SecurityContextHolder.setContext(context); // 여기
+    this.securityContextRepository.saveContext(context, request, response); 
+    if (this.logger.isDebugEnabled()) {
+        this.logger.debug(LogMessage.format("Set SecurityContextHolder to %s", authResult));
+    }
+
+    this.rememberMeServices.loginSuccess(request, response, authResult);
+    if (this.eventPublisher != null) {
+        this.eventPublisher.publishEvent(new InteractiveAuthenticationSuccessEvent(authResult, this.getClass()));
+    }
+
+    this.successHandler.onAuthenticationSuccess(request, response, authResult);
+}
+
+```
+
+`successfulAuthentication`에서 SecurityContextHolder에 authentication객체가 들어가는 것을 확인할 수 있다.
+
+(4. 인증이 된 이후 /dashboard로 다시 리다이렉트한다.)
+
+5. 다시 요청을 처리하는 여러가지 필터들 중에 SecurityContextFilter가 잡는다.
+
+```java
+// SecurityContextPersistenceFilter
+
+private void doFilter(HttpServletRequest request, HttpServletResponse response, FilterChain chain) throws IOException, ServletException {
+        if (request.getAttribute("__spring_security_scpf_applied") != null) {
+            chain.doFilter(request, response);
+        } else {
+            request.setAttribute("__spring_security_scpf_applied", Boolean.TRUE);
+            if (this.forceEagerSessionCreation) {
+                HttpSession session = request.getSession();
+                if (this.logger.isDebugEnabled() && session.isNew()) {
+                    this.logger.debug(LogMessage.format("Created session %s eagerly", session.getId()));
+                }
+            }
+
+            HttpRequestResponseHolder holder = new HttpRequestResponseHolder(request, response);
+            SecurityContext contextBeforeChainExecution = this.repo.loadContext(holder);                         // 불러오기
+            boolean var10 = false;
+
+            try {
+                var10 = true;
+                SecurityContextHolder.setContext(contextBeforeChainExecution);
+                if (contextBeforeChainExecution.getAuthentication() == null) {
+                    this.logger.debug("Set SecurityContextHolder to empty SecurityContext");
+                } else if (this.logger.isDebugEnabled()) {
+                    this.logger.debug(LogMessage.format("Set SecurityContextHolder to %s", contextBeforeChainExecution));
+                }
+
+                chain.doFilter(holder.getRequest(), holder.getResponse());
+                var10 = false;
+            } finally {
+                if (var10) {
+                    SecurityContext contextAfterChainExecution = SecurityContextHolder.getContext();
+                    SecurityContextHolder.clearContext();
+                    this.repo.saveContext(contextAfterChainExecution, holder.getRequest(), holder.getResponse()); // 저장하기
+                    request.removeAttribute("__spring_security_scpf_applied");
+                    this.logger.debug("Cleared SecurityContextHolder to complete request");
+                }
+            }
+
+            SecurityContext contextAfterChainExecution = SecurityContextHolder.getContext();
+            SecurityContextHolder.clearContext();
+            this.repo.saveContext(contextAfterChainExecution, holder.getRequest(), holder.getResponse());         // 저장하기
+            request.removeAttribute("__spring_security_scpf_applied");
+            this.logger.debug("Cleared SecurityContextHolder to complete request");
+        }
+    }
+        
+```
+
+6. SecurityContext를 가져온다. 그때 사용되는 레퍼지토리가 HttpSessionSecurityContextRepository이다.
+(HttpSession에 SecurityContext를 저장하는 저장소를 통해 SecurityContext를 가져오는 것이다.)
+
+7. 가져온 SecurityContext를 다시 SecurityContextHolder에 넣어주는 것이다.
+
+**->** 매 요청마다 시큐리티 컨텍스트가 비워진다. 매번 처음에 들어올때 새로 넣어주고 요청 처리가 끝나면 비워주고
+
+이러한 일을 하는게 `SecurityContextPersistenceFilter` 이다.
+
+인증이 되었던 authentication을 세션에서 꺼내서 복구하는 중인 것이다.
+
+8. 복구가 되면 인증된 객체가 있는 상태로 대쉬보드 요청을 처리해서 보여주는 것이다.
+
+<br>
+
+## 정리 
+
+* 인증을 매니저를 사용하는 부분은 UsernamePasswordAuthenticationFilter였고 authentication 객체를 홀더에 넣는다.
+
+* 로그인 요청을 할때도 SecurityContextPersistenceFilter가 가져오는 것만 하는게 아니라 저장하는 일도 한다.
+
+* SecurityContextPersistenceFilter가 세션에 저장하고 복원하는 역할을 한다.
+
+* 이 말인 즉슨, 세션이 유지가 되어야 인증 정보가 유지가 된다. 
+
+<br>
+
+#### 서버리스
+
+* 물론 http session을 사용하지 않고 서버리스는 매 요청마다 인증을 해야한다. -> 헤더든 요청본문이든 어디에 들어있어야 한다. 
+* 요청이 들어오면 매번 인증을 해서 SecurityContextHolder에 넣어주는 필터를 써야한다.
+
+<br>
+
+## 뒷 내용
+
+* 커스터마이징하려면 필터를 만들어 넣어야 한다. 
+* 이 필터들은 어떻게 설정이 되고 관리를 하는 것인가?
+
+
+
+
