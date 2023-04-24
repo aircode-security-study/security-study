@@ -1,0 +1,130 @@
+# ThreadLocal
+
+* Java, Spring에서 기본으로 제공하는 기능이나 직접적으로 쓰지 않아 생소할 수 있다.
+* Spring Transaction에도 포함되어 있다.
+* 같은 쓰레드 내에서만 공유
+* 같은 쓰레드라면 해당 데이터를 메소드 매개변수로 넘겨줄 필요 없음
+* SecurityContextHolder의 기본 전략
+
+
+```java
+
+@RestController
+public class AccountController {
+
+    @Autowired
+    AccountService accountService;
+
+    @GetMapping("/account/{role}/{username}/{password}")
+    public Account createAccount(@ModelAttribute Account account){
+        return accountService.createNew(account);
+
+    }
+}
+
+```
+<br>
+
+어떤 변수를 선언하면 어떤 스콥이 있다.
+
+* `accountService`는 AccountController 어디서든 접근이 가능하다.
+* `account`는 createAccount 메서드 안에서 접근이 가능하다.
+
+<br>
+
+### ThreadLocal이란,
+변수를 Thread scope의 변수로 선언하도록 해주는 장치이고, 한 쓰레드 내에서 그 변수를 공유한다.  
+
+프로그램이 한 쓰레드에서 동작한다면 파라미터로 넘겨줄 필요 없이 ThreadLocal에 넣어 사용 가능하다.
+
+```java
+
+@Service
+public class SampleService {
+    public void dashboard() {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        Object principal = authentication.getPrincipal();
+        Collection<? extends GrantedAuthority> authorities = authentication.getAuthorities();
+        Object credentials = authentication.getCredentials();
+        boolean authenticated = authentication.isAuthenticated();
+    }
+}
+
+```
+
+SecurityContextHolder를 통해 이런 식으로 참조를 하고 있다.
+
+<br>
+
+### ThreadLocal 사용 예시
+
+한 쓰레드 안에서 공유하는 클래스 AccountContext를 만들겠다.
+
+```java
+public class AccountContext {
+
+    private static final ThreadLocal<Account> ACCOUNT_THREAD_LOCAL = new ThreadLocal<>();
+
+    public static void setAccount(Account account){
+        ACCOUNT_THREAD_LOCAL.set(account);
+    }
+
+    public static Account getAccount(){
+        return ACCOUNT_THREAD_LOCAL.get();
+    }
+}
+
+```
+
+
+```java
+
+@Controller
+public class SampleController {
+    @Autowired SampleService sampleService;
+
+    @Autowired AccountRepository accountRepository;
+    
+    @GetMapping("/dashboard")
+    public String dashboard(Model model, Principal principal){
+        model.addAttribute("message", "Hello " + principal.getName());
+        AccountContext.setAccount(accountRepository.findByUsername(principal.getName()));
+        sampleService.dashboard();
+        return "dashboard";
+    }
+}
+```
+
+위와 같이 우리는 Account를 직접 넣어줬지만 스프링 시큐리티에서는 SecurityContextHolder에는 시큐리티가 알아서 
+인증된 객체를 넣어줄 것이다.
+
+```java
+@Service
+public class SampleService {
+    public void dashboard() {
+        Account account = AccountContext.getAccount();
+        System.out.println("==============");
+        System.out.println(account.getUsername());
+    }
+}
+```
+
+다음과 같이 라미터를 받지 않고 ThreadLocal안에 들어있는 것을 꺼내 쓸 수 있다.
+
+<br>
+
+**각 요청을 처리하는 쓰레드의 각각의 Account를 접속한 화면**
+
+![image](https://user-images.githubusercontent.com/57824259/233564321-c2f6365e-9159-4238-adbf-99a002a7dde2.png)
+
+<br>
+
+이러한 식으로 스프링 시큐리티 인증 기본 전략이 구현되어 있는 것이다.
+
+<br>
+
+**다음 정리**
+
+인증을 하고, 인증을 가져오고까지 살펴봤고  
+
+어디선가는 AuthentocatopManager를 통해서 인증이 된 Authentication이라는 객체를 SecurityConextHolder에서 넣어줘야 한다.
