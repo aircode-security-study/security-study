@@ -39,7 +39,7 @@
   - ExceptionTranslationFilter
   - 스프링 시큐리티 아키텍처 정리
 
-4/25 ~ 5/9 (진행중)
+4/25 ~ 5/10 (완료)
 - 섹션 2. 웹 애플리케이션 시큐리티
   - 스프링 시큐리티 ignoring() 1부
   - 스프링 시큐리티 ignoring() 2부
@@ -53,6 +53,18 @@
   - 폼 인증 처리 필터: UsernamePasswordAuthenticationFilter
   - 로그인/로그아웃 폼 페이지 생성해주는 필터: DefaultLogin/LogoutPageGeneratingFilter
   - 로그인/로그아웃 폼 커스터마이징
+
+5/10 ~ 5/16 (진행중)
+- 섹션 2. 웹 애플리케이션 시큐리티
+  - Basic 인증 처리 필터: BasicAuthenticationFilter
+  - 요청 캐시 필터: RequestCacheAwareFilter
+  - 시큐리티 관련 서블릿 스팩 구현 필터: SecurityContextHolderAwareRequestFilter
+  - 익명 인증 필터: AnonymousAuthenticationFilter
+  - 세션 관리 필터: SessionManagementFilter
+  - 인증/인가 예외 처리 필터: ExceptionTranslationFilter
+  - 인가 처리 필터: FilterSecurityInterceptor
+  - 토큰 기반 인증 필터 : RememberMeAuthenticationFilter
+  - 커스텀 필터 추가하기
 
 ## Contributors
 <p>
