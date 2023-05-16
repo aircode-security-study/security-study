@@ -54,7 +54,7 @@
   - 로그인/로그아웃 폼 페이지 생성해주는 필터: DefaultLogin/LogoutPageGeneratingFilter
   - 로그인/로그아웃 폼 커스터마이징
 
-5/10 ~ 5/16 (진행중)
+5/10 ~ 5/16 (완료)
 - 섹션 2. 웹 애플리케이션 시큐리티
   - Basic 인증 처리 필터: BasicAuthenticationFilter
   - 요청 캐시 필터: RequestCacheAwareFilter
